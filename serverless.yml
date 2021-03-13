@@ -1,0 +1,61 @@
+service: aws-account-setup-apis
+
+frameworkVersion: "2"
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  lambdaHashingVersion: 20201221
+  stage: ${env:Stage}
+  region: ${env:Region}
+
+plugins:
+  - serverless-dotenv-plugin
+  - serverless-cognito-add-custom-attributes
+  - serverless-export-env
+  # - serverless-webpack
+
+package:
+  individually: true
+
+custom:
+  CognitoAddCustomAttributes:
+    - CognitoUserPoolIdOutputKey: "CognitoUserPoolApplicationUserPoolId"
+      CognitoUserPoolClientIdOutputKey: "CognitoUserPoolApplicationUserPoolClientId"
+      CustomAttributes:
+        - AttributeDataType: "String"
+          DeveloperOnlyAttribute: False
+          Mutable: True
+          Name: "tenantName"
+          StringAttributeConstraints:
+            MaxLength: "256"
+            MinLength: "0"
+        - AttributeDataType: "String"
+          DeveloperOnlyAttribute: False
+          Mutable: True
+          Name: "groupName"
+          StringAttributeConstraints:
+            MaxLength: "256"
+            MinLength: "0"
+functions:
+  setupNewAccount:
+    handler: src/index.setupNewAccount
+    role: AllLambdaFunctionsRole
+    environment:
+      Pool_Id:
+        Ref: CognitoUserPoolMyUserPool
+      Client_Id:
+        Ref: CognitoUserPoolClient
+
+    events:
+      - http:
+          path: user/sign-up
+          method: post
+          cors: true
+
+resources:
+  - ${file(resources/iam-roles.yml)}
+  - ${file(resources/cognito-user-pool.yml)}
+  - ${file(resources/cognito-identity-pool.yml)}
+  - ${file(resources/api-gateway-authorizer.yml)}
+  - ${file(resources/api-gateway-errors.yml)}
